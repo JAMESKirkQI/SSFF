@@ -54,7 +54,7 @@ class Cifar10_supervised_ntask(Dataset):
 
 
 class Cifar10_self_supervised(Dataset):
-    def __init__(self, path='/data', models_number=4, expand_ratio=3, train=True, transform=bulid_Cifar10_transform,
+    def __init__(self, path='./data', models_number=4, expand_ratio=3, train=True, transform=bulid_Cifar10_transform,
                  size_ratio=None,
                  # size_ratio=(0.25, 0.25),
                  mask_value=0):
@@ -73,7 +73,7 @@ class Cifar10_self_supervised(Dataset):
         image = np.array(self.CIFAR10[index][0])
         images.append(image)
         for i in range(self.expand_ratio):
-            image = np.array(self.CIFAR10[random.randint(0, len(self.CIFAR10))][0])
+            image = np.array(self.CIFAR10[random.randint(0, len(self.CIFAR10)-1)][0])
             images.append(image)
         _, masked_image, x_cut, y_cut, w_cut, h_cut = draw_forgetting_box(images[0], size_ratio=self.size_ratio,
                                                                           mask_value=self.mask_value)
