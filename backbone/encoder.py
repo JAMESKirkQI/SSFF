@@ -112,9 +112,7 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, nf * 2, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, nf * 4, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, nf * 8, num_blocks[3], stride=2)
-        self.linear = nn.Linear(nf * (2 ** self.down_times) * block.expansion, num_classes)
 
-        self.classifier = self.linear
         self.encoder = nn.Sequential(
             nn.Linear(nf * 8 * block.expansion, nf * 8 * block.expansion),
             nn.ReLU(inplace=True),
@@ -139,7 +137,6 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        feature_list = []
         x = F.relu(self.bn1(self.conv1(x)))
         x = self.layer1(x)
         if self.down_times >= 1:
@@ -148,11 +145,6 @@ class ResNet(nn.Module):
                 x = self.layer3(x)
                 if self.down_times >= 3:
                     x = self.layer4(x)
-        if not self.pretrain:
-            x = avg_pool2d(x, x.shape[2])
-            x = x.view(x.size(0), -1)
-            x = self.classifier(x)
-            return x
         return x
 
 

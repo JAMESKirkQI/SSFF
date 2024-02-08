@@ -103,3 +103,25 @@ class ModelEMA:
         for k in model.__dict__.keys():
             if not k.startswith('_'):
                 setattr(self.ema, k, getattr(model, k))
+
+
+reconstruction_function = nn.BCEWithLogitsLoss(size_average=False).cuda() # mse loss
+
+
+def vae_loss_function(recon_x, x, mu, log_var):
+    """
+    recon_x: generating images
+    x: origin images
+    mu: latent mean
+    logvar: latent log variance
+    """
+    BCE = reconstruction_function(recon_x, x)
+    # loss = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+    KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var).cuda()
+    KLD = torch.sum(KLD_element).mul_(-0.5)
+    # KL divergence
+    return BCE, KLD
+
+
+def forgetting_loss_function(x, x_avg):
+    pass
