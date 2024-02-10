@@ -117,7 +117,7 @@ class Cifar10_self_supervised(Dataset):
 
 
 if __name__ == '__main__':
-    train_dataset = Cifar10_self_supervised()
+    train_dataset = Cifar10_self_supervised(path="/data")
     # print(dataset.CIFAR10)
     batch_size = 2
     nw = 0
@@ -131,6 +131,7 @@ if __name__ == '__main__':
     for img, target in train_dataloader:
         print(img.shape)
         print(target.shape)
+        print(target)
         # img_torch = torch.zeros(img[0][0].shape)
         # x = torch.stack([torch.stack(i, dim=0) for i in img], dim=0)
         # print(x.shape)

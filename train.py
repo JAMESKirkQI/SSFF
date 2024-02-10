@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from datasets import Cifar10_self_supervised
 from models.ffss import FFSS
+from utils import forgetting_loss_function
 from utils.meter import AverageMeter
 
 
@@ -72,6 +73,7 @@ def train() -> None:
             # TODO 做一下feature上面的特征拉取工作FCCL+
             for index, model in enumerate(models):
                 # TODO 把各个模型根据label交集的补集做一个对比学习
+                forgetting_loss_function()
                 #  先把交集的补集写完，mask要给出来然后算loss后乘一下mask
                 pass
                 # TODO 首先在channel方向，然后在logits方向，两个损失待实现

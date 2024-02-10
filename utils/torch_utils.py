@@ -5,6 +5,7 @@ from copy import deepcopy
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 def init_seeds(seed=0):
@@ -105,7 +106,7 @@ class ModelEMA:
                 setattr(self.ema, k, getattr(model, k))
 
 
-reconstruction_function = nn.BCEWithLogitsLoss(size_average=False).cuda() # mse loss
+reconstruction_function = nn.BCEWithLogitsLoss(reduction='sum').cuda()  # mse loss
 
 
 def vae_loss_function(recon_x, x, mu, log_var):
@@ -115,13 +116,49 @@ def vae_loss_function(recon_x, x, mu, log_var):
     mu: latent mean
     logvar: latent log variance
     """
+    ## TODO 是否只重建被遮住的mask部分？
     BCE = reconstruction_function(recon_x, x)
     # loss = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+    ## 是否只对feature进行N~(0,1)规约
     KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var).cuda()
     KLD = torch.sum(KLD_element).mul_(-0.5)
     # KL divergence
     return BCE, KLD
 
 
-def forgetting_loss_function(x, x_avg):
-    pass
+def off_diagonal(x):
+    n, m = x.shape
+    assert n == m
+    return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
+
+def forgetting_loss_function(x, y, x_labels, y_labels):
+    # x_label [0.56250, 0.50000, 0.37500, 0.34375]
+    # calculate mask set
+    bs, _, w, h = x.shape
+    mask = torch.ones(bs, 1, w, h)
+    for i, x_label, y_label in enumerate(zip(x_labels, y_labels)):
+        x1, y1, x_cut1, y_cut1 = [math.floor(label) for label in (x_label * w)]
+        mask[i, :, x1:x1 + x_cut1 + 1, y1:y1 + y_cut1 + 1] = 0
+        x2, y2, x_cut2, y_cut2 = [math.floor(label) for label in (y_label * w)]
+        mask[i, :, x2:x2 + x_cut2 + 1, y2:y2 + y_cut2 + 1] = 0
+
+
+    # calculate loss for channel
+    x = (x*mask).view(bs, -1)
+    y = (y*mask).view(bs, -1)
+    z_1_bn = (x - x.mean(0)) / x.std(0)
+    z_2_bn = (y - y.mean(0)) / y.std(0)
+    # empirical cross-correlation matrix
+    c = z_1_bn.T @ z_2_bn
+    # sum the cross-correlation matrix between all gpus
+    c.div_(len(bs))
+
+    on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
+    off_diag = off_diagonal(c).add_(1).pow_(2).sum()
+    col_loss = on_diag + 0.0051 * off_diag
+
+    inputs = F.log_softmax(x, dim=-1)
+    targets = F.softmax(y, dim=1)
+    loss_distill = F.kl_div(inputs, targets, reduction='batchmean')
+    loss_distill = 0.0051 * loss_distill

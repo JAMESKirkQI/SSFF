@@ -24,7 +24,7 @@ def draw_forgetting_box(image, size_ratio=Optional[tuple], mask_value=0):
     #        round(w_cut / w, 6), round(h_cut / h, 6)
     # center x y w h in ratio
     return image, masked_image, round(x_min / w, 6), round(y_min / h, 6), \
-           round(w_cut / w, 6), round(h_cut  / h, 6)
+           round(w_cut / w, 6), round(h_cut / h, 6)
 
 
 if __name__ == '__main__':
