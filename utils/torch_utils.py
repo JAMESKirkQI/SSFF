@@ -7,6 +7,8 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.nn.functional as F
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 def init_seeds(seed=0):
     torch.manual_seed(seed)
@@ -132,33 +134,49 @@ def off_diagonal(x):
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
 
 
+def calculate_isd_sim(features, temp=1):
+    sim_q = torch.einsum("ijkl,pjkl->ip", features, features)
+    logits_mask = torch.scatter(
+        torch.ones_like(sim_q),
+        1,
+        torch.arange(sim_q.size(0)).view(-1, 1).to(device),
+        0
+    )
+    row_size = sim_q.size(0)
+    sim_q = sim_q[logits_mask.bool()].view(row_size, -1)
+    return sim_q / temp
+
+
 def forgetting_loss_function(x, y, x_labels, y_labels):
     # x_label [0.56250, 0.50000, 0.37500, 0.34375]
     # calculate mask set
     bs, _, w, h = x.shape
-    mask = torch.ones(bs, 1, w, h)
+    mask = torch.ones(bs, 1, w, h).to(device)
     for i, x_label, y_label in enumerate(zip(x_labels, y_labels)):
-        x1, y1, x_cut1, y_cut1 = [math.floor(label) for label in (x_label * w)]
-        mask[i, :, x1:x1 + x_cut1 + 1, y1:y1 + y_cut1 + 1] = 0
-        x2, y2, x_cut2, y_cut2 = [math.floor(label) for label in (y_label * w)]
-        mask[i, :, x2:x2 + x_cut2 + 1, y2:y2 + y_cut2 + 1] = 0
-
+        x1, x_cut1 = math.floor(x_label[0] * w), math.floor(x_label[2] * w)
+        y1, y_cut1 = math.floor(x_label[1] * h), math.floor(x_label[3] * h)
+        mask[i, :, x1:x1 + x_cut1 + 1, y1:y1 + y_cut1 + 1] = torch.zeros([0]).to(device)
+        x2, x_cut2 = math.floor(y_label[0] * w), math.floor(y_label[2] * w)
+        y2, y_cut2 = math.floor(y_label[1] * h), math.floor(y_label[3] * h)
+        mask[i, :, x2:x2 + x_cut2 + 1, y2:y2 + y_cut2 + 1] = torch.zeros([0]).to(device)
 
     # calculate loss for channel
-    x = (x*mask).view(bs, -1)
-    y = (y*mask).view(bs, -1)
-    z_1_bn = (x - x.mean(0)) / x.std(0)
-    z_2_bn = (y - y.mean(0)) / y.std(0)
+    q_1_bn = ((x - x.mean(0)) / x.std(0)) * mask
+    q_2_bn = ((y - y.mean(0)) / y.std(0)) * mask
     # empirical cross-correlation matrix
-    c = z_1_bn.T @ z_2_bn
-    # sum the cross-correlation matrix between all gpus
-    c.div_(len(bs))
+    v = torch.einsum("ijkl,iokl->jo", q_1_bn, q_2_bn)
+    v.div_(len(bs))
 
-    on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
-    off_diag = off_diagonal(c).add_(1).pow_(2).sum()
+    on_diag = torch.diagonal(v).add_(-1).pow_(2).sum()
+    off_diag = off_diagonal(v).add_(1).pow_(2).sum()
     col_loss = on_diag + 0.0051 * off_diag
 
-    inputs = F.log_softmax(x, dim=-1)
-    targets = F.softmax(y, dim=1)
+    # calculate loss for logits
+    x_logits = calculate_isd_sim(x, temp=1)
+    y_logits = calculate_isd_sim(y, temp=1)
+    inputs = F.log_softmax(x_logits, dim=1)
+    targets = F.softmax(y_logits, dim=1)
     loss_distill = F.kl_div(inputs, targets, reduction='batchmean')
-    loss_distill = 0.0051 * loss_distill
+    loss_distill = 3 * loss_distill
+
+    return col_loss, loss_distill

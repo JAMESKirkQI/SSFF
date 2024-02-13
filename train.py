@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import random
 import sys
 import logging
 
@@ -8,7 +9,7 @@ from tqdm import tqdm
 
 from datasets import Cifar10_self_supervised
 from models.ffss import FFSS
-from utils import forgetting_loss_function
+from utils import forgetting_loss_function, random_number_except
 from utils.meter import AverageMeter
 
 
@@ -62,18 +63,20 @@ def train() -> None:
             images, labels = data
             sample_num += images.shape[0]
             batch_size = images.shape[1]
-            feature_outputs=[]
-
+            feature_outputs = []
+            feature_outputs_target = []
             for index, model in enumerate(models):
                 ret = model(images[index])
                 meters['reparameter_loss'].update(ret.get('reparameter_loss', 0), batch_size)
                 meters['reconstruction_loss'].update(ret.get('reconstruction_loss', 0), batch_size)
-
                 feature_outputs.append(ret.get('encode', 0))
-            # TODO 做一下feature上面的特征拉取工作FCCL+
+                feature_outputs_target.append(ret.get('encode', 0).clone().detach())
             for index, model in enumerate(models):
-                # TODO 把各个模型根据label交集的补集做一个对比学习
-                forgetting_loss_function()
-                #  先把交集的补集写完，mask要给出来然后算loss后乘一下mask
-                pass
-                # TODO 首先在channel方向，然后在logits方向，两个损失待实现
+                meters['reconstruction_loss'].update(ret.get('reconstruction_loss', 0), batch_size)
+                select_index = random_number_except(index, models_number)
+                forgetting_loss = forgetting_loss_function(feature_outputs[index],
+                                                           feature_outputs_target[select_index],
+                                                           labels[index], labels[select_index])
+                meters['forgetting_features_loss'].update(forgetting_loss[0], batch_size)
+                meters['forgetting_logits_loss'].update(forgetting_loss[1], batch_size)
+

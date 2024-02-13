@@ -90,3 +90,9 @@ def clip_coords(boxes, img_shape):
     boxes[:, 1].clamp_(0, img_shape[0])  # y1
     boxes[:, 2].clamp_(0, img_shape[1])  # x2
     boxes[:, 3].clamp_(0, img_shape[0])  # y2
+
+def random_number_except(excluded_number,model_nums):
+    while True:
+        num = random.randint(0, model_nums-1)
+        if num != excluded_number:
+            return num
