@@ -134,7 +134,9 @@ def off_diagonal(x):
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
 
 
-def calculate_isd_sim(features, temp=1):
+def calculate_isd_sim(features, mask, temp=0.002):
+    features = F.normalize(features, dim=1)
+    features = features * mask
     sim_q = torch.einsum("ijkl,pjkl->ip", features, features)
     logits_mask = torch.scatter(
         torch.ones_like(sim_q),
@@ -152,31 +154,33 @@ def forgetting_loss_function(x, y, x_labels, y_labels):
     # calculate mask set
     bs, _, w, h = x.shape
     mask = torch.ones(bs, 1, w, h).to(device)
-    for i, x_label, y_label in enumerate(zip(x_labels, y_labels)):
-        x1, x_cut1 = math.floor(x_label[0] * w), math.floor(x_label[2] * w)
-        y1, y_cut1 = math.floor(x_label[1] * h), math.floor(x_label[3] * h)
-        mask[i, :, x1:x1 + x_cut1 + 1, y1:y1 + y_cut1 + 1] = torch.zeros([0]).to(device)
-        x2, x_cut2 = math.floor(y_label[0] * w), math.floor(y_label[2] * w)
-        y2, y_cut2 = math.floor(y_label[1] * h), math.floor(y_label[3] * h)
-        mask[i, :, x2:x2 + x_cut2 + 1, y2:y2 + y_cut2 + 1] = torch.zeros([0]).to(device)
+
+    for i, label in enumerate(zip(x_labels, y_labels)):
+        x_label, y_label = label
+        x1, x1_cut = math.floor(x_label[0] * w), math.floor(x_label[2] * w)
+        y1, y1_cut = math.floor(x_label[1] * h), math.floor(x_label[3] * h)
+        mask[i, :, x1:x1 + x1_cut, y1:y1 + y1_cut] = 0
+        x2, x2_cut = math.floor(y_label[0] * w), math.floor(y_label[2] * w)
+        y2, y2_cut = math.floor(y_label[1] * h), math.floor(y_label[3] * h)
+        mask[i, :, x2:x2 + x2_cut, y2:y2 + y2_cut] = 0
 
     # calculate loss for channel
     q_1_bn = ((x - x.mean(0)) / x.std(0)) * mask
     q_2_bn = ((y - y.mean(0)) / y.std(0)) * mask
     # empirical cross-correlation matrix
     v = torch.einsum("ijkl,iokl->jo", q_1_bn, q_2_bn)
-    v.div_(len(bs))
-
+    v=v.div_(bs)
+    #TODO 解决on_diag和off_diag值为NAN问题
     on_diag = torch.diagonal(v).add_(-1).pow_(2).sum()
     off_diag = off_diagonal(v).add_(1).pow_(2).sum()
     col_loss = on_diag + 0.0051 * off_diag
 
     # calculate loss for logits
-    x_logits = calculate_isd_sim(x, temp=1)
-    y_logits = calculate_isd_sim(y, temp=1)
+    x_logits = calculate_isd_sim(x, mask, temp=0.002)
+    y_logits = calculate_isd_sim(y, mask, temp=0.002)
     inputs = F.log_softmax(x_logits, dim=1)
     targets = F.softmax(y_logits, dim=1)
     loss_distill = F.kl_div(inputs, targets, reduction='batchmean')
-    loss_distill = 3 * loss_distill
+    loss_distill = 3.0 * loss_distill
 
     return col_loss, loss_distill
