@@ -169,10 +169,12 @@ def forgetting_loss_function(x, y, x_labels, y_labels):
     q_2_bn = ((y - y.mean(0)) / y.std(0)) * mask
     # empirical cross-correlation matrix
     v = torch.einsum("ijkl,iokl->jo", q_1_bn, q_2_bn)
-    v=v.div_(bs)
-    #TODO 解决on_diag和off_diag值为NAN问题
-    on_diag = torch.diagonal(v).add_(-1).pow_(2).sum()
-    off_diag = off_diagonal(v).add_(1).pow_(2).sum()
+    v = torch.div(v, bs)
+
+    on_diag_index = ~torch.diagonal(v).isnan()
+    off_diag_index = ~off_diagonal(v).isnan()
+    on_diag = torch.diagonal(v).add_(-1).pow_(2)[on_diag_index].sum()
+    off_diag = off_diagonal(v).add_(1).pow_(2)[off_diag_index].sum()
     col_loss = on_diag + 0.0051 * off_diag
 
     # calculate loss for logits
