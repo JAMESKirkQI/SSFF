@@ -40,15 +40,14 @@ class FFSS(nn.Module):
         f = self.encoder(x)
         ret.update({'encode': f})
         if self.pretrain:
-            # TODO 这个地方看看能不能舍去conv 直接对f进行N~(0,1)的分布规约
             mu = self.conv_vae_mu(f)
             log_var = self.conv_vae_var(f)
             z = self.reparameter(mu, log_var)
 
             reconstruction = self.decoder(z)
             reconstruction_loss, reparameter_loss = vae_loss_function(reconstruction, x, mu, log_var)
-            ret.update({'reconstruction_loss': reconstruction_loss})
-            ret.update({'reparameter_loss': reparameter_loss})
+            ret.update({'reconstruction_loss': reconstruction_loss * 0.1})
+            ret.update({'reparameter_loss': reparameter_loss * 0.1})
 
             return ret
         else:

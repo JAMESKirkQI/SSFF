@@ -108,7 +108,7 @@ class ModelEMA:
                 setattr(self.ema, k, getattr(model, k))
 
 
-reconstruction_function = nn.BCEWithLogitsLoss(reduction='sum').cuda()  # mse loss
+reconstruction_function = nn.BCEWithLogitsLoss(reduction='sum').to(device)  # mse loss
 
 
 def vae_loss_function(recon_x, x, mu, log_var):
@@ -118,11 +118,9 @@ def vae_loss_function(recon_x, x, mu, log_var):
     mu: latent mean
     logvar: latent log variance
     """
-    ## TODO 是否只重建被遮住的mask部分？
     BCE = reconstruction_function(recon_x, x)
     # loss = 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-    ## 是否只对feature进行N~(0,1)规约
-    KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var).cuda()
+    KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var)
     KLD = torch.sum(KLD_element).mul_(-0.5)
     # KL divergence
     return BCE, KLD

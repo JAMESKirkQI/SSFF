@@ -1,43 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="fedserver@cq" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="cq" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
-      <paths name="fedserver@cq">
+      <paths name="cq">
         <serverdata>
           <mappings>
-            <mapping deploy="/code/SSFF" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/code/SSFF " local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@222.187.226.110:15642">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="root@connect.east.seetacloud.com:50427">
+      <paths name="maskrcnn_water">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@connect.east.seetacloud.com:50427 password">
+      <paths name="mobileVIT">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@connect.east.seetacloud.com:50427 password (1)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="root@connect.east.seetacloud.com:50427 password (2)">
+      <paths name="test@192.168.21.240:22">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
